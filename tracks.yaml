@@ -17,7 +17,7 @@ tracks:
     name: upstream
     patches: null
     release_inc: '0'
-    release_repo_url: null
+    release_repo_url: git@github.com:intel-ros/realsense-release.git
     release_tag: :{version}
     ros_distro: kinetic
     vcs_type: git
