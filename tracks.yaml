@@ -16,7 +16,7 @@ tracks:
     last_version: 1.2.0
     name: upstream
     patches: null
-    release_inc: '3'
+    release_inc: '4'
     release_repo_url: git@github.com:intel-ros/realsense-release.git
     release_tag: :{version}
     ros_distro: indigo
