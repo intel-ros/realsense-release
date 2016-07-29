@@ -40,19 +40,19 @@
 #include <image_transport/image_transport.h>
 
 #include <camera_info_manager/camera_info_manager.h>
-#include "std_msgs/String.h"
+#include <std_msgs/String.h>
 #include <ros/ros.h>
 #include <pcl/conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/PCLPointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include "std_msgs/Float32MultiArray.h"
+#include <std_msgs/Float32MultiArray.h>
 #include <cv_bridge/cv_bridge.h>
 #include <realsense_camera/cameraConfiguration.h>
 #include <tf/transform_listener.h>
 #include <librealsense/rs.h>
-#include "constants.h"
+#include <realsense_camera/constants.h>
 
 using namespace realsense_camera;
 
@@ -68,7 +68,7 @@ uint32_t g_infrared2_step_exp; // Expected infrared2 step.
 
 bool g_enable_color = true;
 bool g_enable_depth = true;
-bool g_enable_pointcloud = true;
+bool g_enable_pointcloud = false;
 
 std::string g_depth_encoding_exp; // Expected depth encoding.
 std::string g_color_encoding_exp; // Expected color encoding.
@@ -104,11 +104,14 @@ std::string g_encoding_recv[STREAM_COUNT]; // Expected stream encoding.
 int g_caminfo_height_recv[STREAM_COUNT] = {0};
 int g_caminfo_width_recv[STREAM_COUNT] = {0};
 float g_color_caminfo_D_recv[5] = {0};
+float g_depth_caminfo_D_recv[5] = {0};
+float g_infrared1_caminfo_D_recv[5] = {0};
+float g_infrared2_caminfo_D_recv[5] = {0};
 
 double g_caminfo_rotation_recv[STREAM_COUNT][9] = {0};
 double g_caminfo_projection_recv[STREAM_COUNT][12] = {0};
 
 std::string g_dmodel_recv[STREAM_COUNT];
-std::string g_camera = "R200";
+std::string g_camera_type;
 
 realsense_camera::cameraConfiguration g_srv;

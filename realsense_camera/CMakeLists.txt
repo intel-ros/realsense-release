@@ -46,6 +46,7 @@ generate_messages(
 #add dynamic reconfigure api
 generate_dynamic_reconfigure_options(
   cfg/r200_params.cfg
+  cfg/f200_params.cfg
 )
 
 #################################
@@ -69,7 +70,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(${PROJECT_NAME}_nodelet src/base_nodelet.cpp src/r200_nodelet.cpp)
+add_library(${PROJECT_NAME}_nodelet src/base_nodelet.cpp src/r200_nodelet.cpp src/f200_nodelet.cpp)
 target_link_libraries(${PROJECT_NAME}_nodelet
   ${catkin_LIBRARIES}
   # This should be removed once librealsense is a required component
@@ -95,26 +96,28 @@ add_dependencies(tests_rgbd_topics ${PROJECT_NAME}_generate_messages_cpp)
 add_dependencies(tests_rgbd_topics ${catkin_EXPORTED_TARGETS})
 
 # Install nodelet library
-install(TARGETS ${PROJECT_NAME}_nodelet LIBRARY
-    DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+install(TARGETS ${PROJECT_NAME}_nodelet
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 # Install header files
-install(DIRECTORY include/
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/include
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )
 
 # Install launch files
 install(DIRECTORY launch/
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
 
 # Install rviz files
 install(DIRECTORY rviz/
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/rviz
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/rviz
 )
 
 # Install xml files
 install(FILES nodelet_plugins.xml
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
