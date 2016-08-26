@@ -28,6 +28,8 @@
  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
 
+#include <iostream>
+
 #pragma once
 #ifndef NODELET_CONSTANTS
 #define NODELET_CONSTANTS
@@ -46,9 +48,6 @@ namespace realsense_camera
     const bool ENABLE_COLOR = true;
     const bool ENABLE_PC = false;
     const bool ENABLE_TF = true;
-    const rs_format DEPTH_FORMAT = RS_FORMAT_Z16;
-    const rs_format COLOR_FORMAT = RS_FORMAT_RGB8;
-    const rs_format IR_FORMAT = RS_FORMAT_Y8;
     const std::string DEFAULT_MODE = "preset";
     const std::string DEFAULT_BASE_FRAME_ID = "camera_link";
     const std::string DEFAULT_DEPTH_FRAME_ID = "camera_depth_frame";
@@ -60,16 +59,23 @@ namespace realsense_camera
     const std::string DEPTH_TOPIC = "camera/depth/image_raw";
     const std::string COLOR_TOPIC = "camera/color/image_raw";
     const std::string IR_TOPIC = "camera/ir/image_raw";
-    const std::string IR2_TOPIC = "camera/ir2/image_raw";
     const std::string PC_TOPIC = "camera/depth/points";
     const std::string SETTINGS_SERVICE = "camera/get_settings";
     const std::string STREAM_DESC[STREAM_COUNT] = {"Depth", "Color", "IR", "IR2"};
     const double ROTATION_IDENTITY[] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+    const float MILLIMETER_METERS  = 0.001;
 
     // R200 Constants.
-    const int R200_MAX_Z = 10;      // in meters
+    const std::string IR2_TOPIC = "camera/ir2/image_raw";
+    // Indoor Range: 0.7m - 3.5m, Outdoor Range: 10m
+    const float R200_MAX_Z = 10.0f;   // in meters
 
     // F200 Constants.
-    const int F200_MAX_Z = 1;      // in meters
+    // Indoor Range: 0.2m – 1.0m, Outdoor Range: n/a
+    const float F200_MAX_Z = 1.0f;    // in meters
+
+    // SR300 Constants.
+    // Indoor Range: 0.2m – 1.5m, Outdoor Range: n/a
+    const float SR300_MAX_Z = 1.5f; // in meters
 }
 #endif

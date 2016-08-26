@@ -62,6 +62,7 @@
 #include <realsense_camera/cameraConfiguration.h>
 #include <pluginlib/class_list_macros.h>
 #include <tf/transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <realsense_camera/constants.h>
 
 namespace realsense_camera
@@ -74,7 +75,6 @@ namespace realsense_camera
     virtual void onInit();
     virtual ~BaseNodelet();
     virtual void prepareTopics();
-    virtual void prepareTransforms();
     virtual bool getCameraOptionValues(realsense_camera::cameraConfiguration::Request & req,
         realsense_camera::cameraConfiguration::Response & res);
 
@@ -86,6 +86,7 @@ namespace realsense_camera
     ros::Time topic_ts_;
     ros::Publisher pointcloud_publisher_;
     ros::ServiceServer get_options_service_;
+    tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
     rs_error *rs_error_ = 0;
     rs_context *rs_context_;
     rs_device *rs_device_;
@@ -98,23 +99,27 @@ namespace realsense_camera
     int width_[STREAM_COUNT];
     int height_[STREAM_COUNT];
     int fps_[STREAM_COUNT];
+    rs_format format_[STREAM_COUNT];
+    std::string encoding_[STREAM_COUNT];
+    int cv_type_[STREAM_COUNT];
+    int unit_step_size_[STREAM_COUNT];
     int step_[STREAM_COUNT];
     int ts_[STREAM_COUNT];
     std::string frame_id_[STREAM_COUNT];
-    std::string encoding_[STREAM_COUNT];
     cv::Mat image_[STREAM_COUNT] = {};
     image_transport::CameraPublisher camera_publisher_[STREAM_COUNT] = {};
     sensor_msgs::CameraInfoPtr camera_info_ptr_[STREAM_COUNT] = {};
     std::string base_frame_id_;
     std::string depth_frame_id_;
     std::string color_frame_id_;
-    int max_z_ = -1;
+    float max_z_ = -1.0f;
     bool enable_pointcloud_;
     bool enable_tf_;
     bool duplicate_depth_color_;
     const uint16_t *image_depth16_;
     boost::shared_ptr<boost::thread> topic_thread_;
-    boost::shared_ptr<boost::thread> transform_thread_;
+    float depth_scale_meters_;
+    cv::Mat cvWrapper_;
 
     struct CameraOptions
     {
@@ -143,6 +148,7 @@ namespace realsense_camera
     virtual void publishTopic(rs_stream stream_index);
     virtual void getStreamData(rs_stream stream_index);
     virtual void publishPCTopic();
+    virtual void publishStaticTransforms();
     virtual void checkError();
   };
 }
