@@ -246,11 +246,18 @@ namespace realsense_camera
    */
   void BaseNodelet::advertiseTopics()
   {
-    image_transport::ImageTransport image_transport(nh_);
-    camera_publisher_[RS_STREAM_COLOR] = image_transport.advertiseCamera(COLOR_TOPIC, 1);
-    camera_publisher_[RS_STREAM_DEPTH] = image_transport.advertiseCamera(DEPTH_TOPIC, 1);
-    camera_publisher_[RS_STREAM_INFRARED] = image_transport.advertiseCamera(IR_TOPIC, 1);
-    pointcloud_publisher_ = nh_.advertise<sensor_msgs::PointCloud2>(PC_TOPIC, 1);
+    ros::NodeHandle color_nh(nh_, COLOR_NAMESPACE);
+    image_transport::ImageTransport color_image_transport(color_nh);
+    camera_publisher_[RS_STREAM_COLOR] = color_image_transport.advertiseCamera(COLOR_TOPIC, 1);
+
+    ros::NodeHandle depth_nh(nh_, DEPTH_NAMESPACE);
+    image_transport::ImageTransport depth_image_transport(depth_nh);
+    camera_publisher_[RS_STREAM_DEPTH] = depth_image_transport.advertiseCamera(DEPTH_TOPIC, 1);
+    pointcloud_publisher_ = depth_nh.advertise<sensor_msgs::PointCloud2>(PC_TOPIC, 1);
+
+    ros::NodeHandle ir_nh(nh_, IR_NAMESPACE);
+    image_transport::ImageTransport ir_image_transport(ir_nh);
+    camera_publisher_[RS_STREAM_INFRARED] = ir_image_transport.advertiseCamera(IR_TOPIC, 1);
   }
 
   /*
@@ -258,14 +265,17 @@ namespace realsense_camera
    */
   void BaseNodelet::advertiseServices()
   {
-    get_options_service_ = nh_.advertiseService(SETTINGS_SERVICE, &BaseNodelet::getCameraOptionValues, this);
+    get_options_service_ = pnh_.advertiseService(SETTINGS_SERVICE, &BaseNodelet::getCameraOptionValues, this);
+    set_power_service_ = pnh_.advertiseService(CAMERA_SET_POWER_SERVICE, &BaseNodelet::setPowerCameraService, this);
+    force_power_service_ = pnh_.advertiseService(CAMERA_FORCE_POWER_SERVICE, &BaseNodelet::forcePowerCameraService, this);
+    is_powered_service_ = pnh_.advertiseService(CAMERA_IS_POWERED_SERVICE, &BaseNodelet::isPoweredCameraService, this);
   }
 
   /*
    * Get the latest values of the camera options.
    */
-  bool BaseNodelet::getCameraOptionValues(realsense_camera::cameraConfiguration::Request & req,
-      realsense_camera::cameraConfiguration::Response & res)
+  bool BaseNodelet::getCameraOptionValues(realsense_camera::CameraConfiguration::Request & req,
+      realsense_camera::CameraConfiguration::Response & res)
   {
     std::string get_options_result_str;
     std::string opt_name, opt_value;
@@ -282,6 +292,91 @@ namespace realsense_camera
     res.configuration_str = get_options_result_str;
     return true;
   }
+
+  /*
+   * Check for Nodelet subscribers
+   */
+  bool BaseNodelet::checkForSubscriber()
+  {
+    for (int index=0; index < STREAM_COUNT; index++)
+    {
+      if (camera_publisher_[index].getNumSubscribers() > 0)
+      {
+        return true;
+      }
+    }
+    if (pointcloud_publisher_.getNumSubscribers() > 0)
+    {
+        return true;
+    }
+    return false;
+  }
+
+  /*
+   * Service to check if camera is powered on or not
+   */
+  bool BaseNodelet::isPoweredCameraService(realsense_camera::IsPowered::Request & req,
+      realsense_camera::IsPowered::Response & res)
+  {
+      if (rs_is_device_streaming(rs_device_, 0) == 1)
+      {
+        res.is_powered = true;
+      }
+      else
+      {
+        res.is_powered = false;
+      }
+      return true;
+  }
+
+  /*
+   * Set Power Camera service
+   */
+  bool BaseNodelet::setPowerCameraService(realsense_camera::SetPower::Request & req,
+      realsense_camera::SetPower::Response & res)
+  {
+    res.success = true;
+
+    if (req.power_on == true)
+    {
+      start_camera_ = true;
+      start_stop_srv_called_ = true;
+    }
+    else
+    {
+      if (rs_is_device_streaming(rs_device_, 0) == 0)
+      {
+        ROS_INFO_STREAM(nodelet_name_ << " - Camera is already Stopped");
+      }
+      else
+      {
+        if (checkForSubscriber() == false)
+        {
+          start_camera_ = false;
+          start_stop_srv_called_ = true;
+        }
+        else
+        {
+          ROS_INFO_STREAM(nodelet_name_ << " - Cannot stop the camera. Nodelet has subscriber.");
+          res.success = false;
+        }
+      }
+    }
+    return res.success;
+  }
+
+
+  /*
+   * Force Power Camera service
+   */
+  bool BaseNodelet::forcePowerCameraService(realsense_camera::ForcePower::Request & req,
+      realsense_camera::ForcePower::Response & res)
+  {
+    start_camera_ = req.power_on;
+    start_stop_srv_called_ = true;
+    return true;
+  }
+
 
   /*
    * Get the options supported by the camera along with their min, max and step values.
@@ -525,28 +620,33 @@ namespace realsense_camera
   /*
    * Start camera.
    */
-  void BaseNodelet::startCamera()
+  std::string BaseNodelet::startCamera()
   {
     if (rs_is_device_streaming(rs_device_, 0) == 0)
     {
       ROS_INFO_STREAM(nodelet_name_ << " - Starting camera");
       rs_start_device(rs_device_, &rs_error_);
       checkError();
+      return "Camera Started Succesfully";
     }
+    return "Camera is already Started";
   }
 
   /*
    * Stop camera.
    */
-  void BaseNodelet::stopCamera()
+  std::string BaseNodelet::stopCamera()
   {
     if (rs_is_device_streaming(rs_device_, 0) == 1)
     {
       ROS_INFO_STREAM(nodelet_name_ << " - Stopping camera");
       rs_stop_device(rs_device_, 0);
       checkError();
+      return "Camera Stopped Succesfully";
     }
+    return "Camera is already Stopped";
   }
+
 
   /*
    * Copy frame data from realsense to member cv images.
@@ -582,6 +682,19 @@ namespace realsense_camera
   {
     while (ros::ok())
     {
+      if (start_stop_srv_called_ == true)
+      {
+        if (start_camera_ == true)
+        {
+          ROS_INFO_STREAM(nodelet_name_ << " - " << startCamera());
+        }
+        else
+        {
+          ROS_INFO_STREAM(nodelet_name_ << " - " << stopCamera());
+        }
+        start_stop_srv_called_ = false;
+      }
+
       if (enable_[RS_STREAM_DEPTH] != rs_is_stream_enabled(rs_device_, RS_STREAM_DEPTH, 0))
       {
         stopCamera();
