@@ -1,3 +1,26 @@
+## realsense_camera (kinetic) - 1.5.0-0
+
+The packages in the `realsense_camera` repository were released into the `kinetic` distro by running `/usr/bin/bloom-release --track kinetic --rosdistro kinetic realsense_camera` on `Thu, 29 Sep 2016 22:58:12 -0000`
+
+The `realsense_camera` package was released.
+
+Version of package(s) in repository `realsense_camera`:
+
+- upstream repository: https://github.com/intel-ros/realsense.git
+- release repository: https://github.com/intel-ros/realsense-release.git
+- rosdistro version: `1.4.0-0`
+- old version: `1.4.0-0`
+- new version: `1.5.0-0`
+
+Versions of tools used:
+
+- bloom version: `0.5.22`
+- catkin_pkg version: `0.2.10`
+- rosdep version: `0.11.5`
+- rosdistro version: `0.4.7`
+- vcstools version: `0.1.39`
+
+
 ## realsense_camera (indigo) - 1.5.0-0
 
 The packages in the `realsense_camera` repository were released into the `indigo` distro by running `/usr/bin/bloom-release --track indigo --rosdistro indigo realsense_camera` on `Thu, 29 Sep 2016 22:55:08 -0000`
