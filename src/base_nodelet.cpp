@@ -45,17 +45,31 @@ namespace realsense_camera
 
     stopCamera();
 
-    rs_delete_context(rs_context_, &rs_error_);
-    checkError();
+    if (rs_context_)
+    {
+      rs_delete_context(rs_context_, &rs_error_);
+      rs_context_ = NULL;
+      checkError();
+    }
+
+    // Kill all old system progress groups
+    while (! system_proc_groups_.empty())
+    {
+      killpg(system_proc_groups_.front(), SIGHUP);
+      system_proc_groups_.pop();
+    }
 
     ROS_INFO_STREAM(nodelet_name_ << " - Stopping...");
-    ros::shutdown();
+    if (! ros::isShuttingDown())
+    {
+      ros::shutdown();
+    }
   }
 
   /*
    * Initialize the nodelet.
    */
-  void BaseNodelet::onInit()
+  void BaseNodelet::onInit() try
   {
     getParameters();
 
@@ -92,6 +106,23 @@ namespace realsense_camera
     // Start dynamic reconfigure callback
     startDynamicReconfCallback();
   }
+  catch(const rs::error & e)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - " << "RealSense error calling "
+        << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    "
+        << e.what());
+    ros::shutdown();
+  }
+  catch(const std::exception & e)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - " << e.what());
+    ros::shutdown();
+  }
+  catch(...)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown expection...shutting down!");
+    ros::shutdown();
+  }
 
   /*
    * Get the nodelet parameters.
@@ -107,6 +138,7 @@ namespace realsense_camera
     pnh_.param("mode", mode_, DEFAULT_MODE);
     pnh_.param("enable_depth", enable_[RS_STREAM_DEPTH], ENABLE_DEPTH);
     pnh_.param("enable_color", enable_[RS_STREAM_COLOR], ENABLE_COLOR);
+    pnh_.param("enable_ir", enable_[RS_STREAM_INFRARED], ENABLE_IR);
     pnh_.param("enable_pointcloud", enable_pointcloud_, ENABLE_PC);
     pnh_.param("enable_tf", enable_tf_, ENABLE_TF);
     pnh_.param("depth_width", width_[RS_STREAM_DEPTH], DEPTH_WIDTH);
@@ -130,6 +162,10 @@ namespace realsense_camera
   bool BaseNodelet::connectToCamera()
   {
     rs_context_ = rs_create_context(RS_API_VERSION, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - No cameras detected!");
+    }
     checkError();
 
     int num_of_cameras = rs_get_device_count(rs_context_, &rs_error_);
@@ -140,6 +176,7 @@ namespace realsense_camera
     {
       ROS_ERROR_STREAM(nodelet_name_ << " - No cameras detected!");
       rs_delete_context(rs_context_, &rs_error_);
+      rs_context_ = NULL;
       checkError();
       return false;
     }
@@ -152,6 +189,7 @@ namespace realsense_camera
     {
       ROS_ERROR_STREAM(nodelet_name_ << " - No '" << camera_type_ << "' cameras detected!");
       rs_delete_context(rs_context_, &rs_error_);
+      rs_context_ = NULL;
       checkError();
       return false;
     }
@@ -162,6 +200,7 @@ namespace realsense_camera
       ROS_ERROR_STREAM(nodelet_name_ <<
           " - Multiple cameras of same type detected but no input serial_no or usb_port_id specified");
       rs_delete_context(rs_context_, &rs_error_);
+      rs_context_ = NULL;
       checkError();
       return false;
     }
@@ -196,6 +235,7 @@ namespace realsense_camera
       ROS_ERROR_STREAM(nodelet_name_ << error_msg);
 
       rs_delete_context(rs_context_, &rs_error_);
+      rs_context_ = NULL;
       checkError();
       return false;
     }
@@ -511,7 +551,16 @@ namespace realsense_camera
             camera_info_ptr_[RS_STREAM_DEPTH]->width, cv_type_[RS_STREAM_DEPTH], cv::Scalar(0, 0, 0));
       }
       ts_[RS_STREAM_DEPTH] = -1;
+      depth_scale_meters_ = rs_get_device_depth_scale(rs_device_, &rs_error_);
+      checkError();
+    }
+    else if (enable_[RS_STREAM_DEPTH] == false)
+    {
+      disableStream(RS_STREAM_DEPTH);
+    }
 
+    if (enable_[RS_STREAM_INFRARED] == true)
+    {
       enableStream(RS_STREAM_INFRARED, width_[RS_STREAM_DEPTH], height_[RS_STREAM_DEPTH], format_[RS_STREAM_INFRARED],
           fps_[RS_STREAM_DEPTH]);
       if (camera_info_ptr_[RS_STREAM_INFRARED] == NULL)
@@ -523,13 +572,10 @@ namespace realsense_camera
             camera_info_ptr_[RS_STREAM_INFRARED]->width, cv_type_[RS_STREAM_INFRARED], cv::Scalar(0, 0, 0));
       }
       ts_[RS_STREAM_INFRARED] = -1;
-      depth_scale_meters_ = rs_get_device_depth_scale(rs_device_, &rs_error_);
-      checkError();
     }
-    else if (enable_[RS_STREAM_DEPTH] == false)
+    else if (enable_[RS_STREAM_INFRARED] == false)
     {
-      disableStream(RS_STREAM_DEPTH);
-      disableStream(RS_STREAM_INFRARED);
+    	disableStream(RS_STREAM_INFRARED);
     }
   }
 
@@ -562,6 +608,10 @@ namespace realsense_camera
   {
     rs_intrinsics intrinsic;
     rs_get_stream_intrinsics(rs_device_, stream_index, &intrinsic, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera firmware version and/or calibration data!");
+    }
     checkError();
 
     sensor_msgs::CameraInfo * camera_info = new sensor_msgs::CameraInfo();
@@ -597,6 +647,10 @@ namespace realsense_camera
       // set depth to color translation values in Projection matrix (P)
       rs_extrinsics z_extrinsic;
       rs_get_device_extrinsics(rs_device_, RS_STREAM_DEPTH, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
+      if (rs_error_)
+      {
+        ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+      }
       checkError();
       camera_info->P.at(3) = z_extrinsic.translation[0];     // Tx
       camera_info->P.at(7) = z_extrinsic.translation[1];     // Ty
@@ -696,7 +750,7 @@ namespace realsense_camera
   /*
    * Prepare and publish topics.
    */
-  void BaseNodelet::prepareTopics()
+  void BaseNodelet::prepareTopics() try
   {
     while (ros::ok())
     {
@@ -746,6 +800,23 @@ namespace realsense_camera
         }
       }
     }
+  }
+  catch(const rs::error & e)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - " << "RealSense error calling "
+        << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    "
+        << e.what());
+    ros::shutdown();
+  }
+  catch(const std::exception & e)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - " << e.what());
+    ros::shutdown();
+  }
+  catch(...)
+  {
+    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown expection...shutting down!");
+    ros::shutdown();
   }
 
   /*
@@ -962,6 +1033,10 @@ namespace realsense_camera
 
     // Get offset between base frame and depth frame
     rs_get_device_extrinsics(rs_device_, RS_STREAM_DEPTH, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
     checkError();
 
     // Transform base frame to depth frame
@@ -993,6 +1068,10 @@ namespace realsense_camera
 
     // Get offset between base frame and infrared frame
     rs_get_device_extrinsics(rs_device_, RS_STREAM_INFRARED, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
     checkError();
 
     // Transform base frame to infrared frame
@@ -1033,8 +1112,56 @@ namespace realsense_camera
       ROS_ERROR_STREAM(nodelet_name_ << " - Error calling " << rs_get_failed_function(rs_error_) << " ( "
           << rs_get_failed_args(rs_error_) << " ): \n" << rs_get_error_message(rs_error_) << " \n");
       rs_free_error(rs_error_);
+      rs_error_ = NULL;
       ros::shutdown();
-      exit (EXIT_FAILURE);
+    }
+  }
+
+  void BaseNodelet::wrappedSystem(std::vector<std::string> string_argv)
+  {
+    pid_t pid;
+
+    // Convert the args to char * const * for exec
+    char * argv[string_argv.size() + 1];
+
+    for(size_t i = 0; i < string_argv.size(); ++i)
+    {
+      argv[i] = const_cast<char*>(string_argv[i].c_str());
+    }
+    argv[string_argv.size()] = NULL;
+
+    pid = fork();
+
+    if (pid == -1)
+    { // failed to fork
+        ROS_WARN_STREAM(nodelet_name_ <<
+            " - Failed to set dynamic_reconfigure dc preset via system:"
+            << strerror(errno));
+    }
+    else if (pid == 0)
+    { // child process
+      // set to it's own process group
+      setpgid(getpid(), getpid());
+
+      // sleep for 1 second to ensure previous calls are completed
+      sleep(1);
+      // environ is the current environment from <unistd.h>
+      execvpe(argv[0], argv, environ);
+
+      _exit(EXIT_FAILURE);   // exec never returns
+    }
+    else
+    { // parent process
+      // Save the progress pid (process group)
+      system_proc_groups_.push(pid);
+
+      // If more than 10, process the oldest now
+      if (system_proc_groups_.size() > 10)
+      {
+        killpg(system_proc_groups_.front(), SIGHUP);
+        system_proc_groups_.pop();
+      }
+      // do not wait as this is the main thread
     }
   }
 }  // end namespace
