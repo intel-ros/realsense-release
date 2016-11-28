@@ -85,6 +85,7 @@ namespace realsense_camera
     pnh_.param("ir2_optical_frame_id", optical_frame_id_[RS_STREAM_INFRARED2], DEFAULT_IR2_OPTICAL_FRAME_ID);
     pnh_.param("enable_fisheye", enable_[RS_STREAM_FISHEYE], ENABLE_FISHEYE);
     pnh_.param("enable_imu", enable_imu_, ENABLE_IMU);
+    pnh_.param("enable_ir2", enable_[RS_STREAM_INFRARED2], ENABLE_IR2);
     pnh_.param("fisheye_width", width_[RS_STREAM_FISHEYE], FISHEYE_WIDTH);
     pnh_.param("fisheye_height", height_[RS_STREAM_FISHEYE], FISHEYE_HEIGHT);
     pnh_.param("fisheye_fps", fps_[RS_STREAM_FISHEYE], FISHEYE_FPS);
@@ -133,6 +134,10 @@ namespace realsense_camera
 
     rs_motion_intrinsics imu_intrinsics;
     rs_get_motion_intrinsics(rs_device_, &imu_intrinsics, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera firmware version!");
+    }
     checkError();
 
     int index = 0;
@@ -207,24 +212,16 @@ namespace realsense_camera
     // There is not a C++ API for dynamic reconfig so we need to use a system call
     // Adding the sleep to ensure the current callback can end before we
     // attempt the next callback from the system call.
-    std::string system_cmd = "(sleep 1 ; rosrun dynamic_reconfigure dynparam set "
-      + nodelet_name_ + " r200_dc_preset " + std::to_string(preset) + ")&";
+    std::vector<std::string> argv;
+    argv.push_back("rosrun");
+    argv.push_back("dynamic_reconfigure");
+    argv.push_back("dynparam");
+    argv.push_back("set");
+    argv.push_back(nodelet_name_);
+    argv.push_back("r200_dc_preset");
+    argv.push_back(std::to_string(preset));
 
-    int status = std::system(system_cmd.c_str());
-    if (status < 0)
-    {
-      ROS_WARN_STREAM(nodelet_name_ <<
-          " - Failed to set dynamic_reconfigure dc preset via system:"
-          << strerror(errno));
-    }
-    else
-    {
-      if (!WIFEXITED(status))
-      {
-        ROS_WARN_STREAM(nodelet_name_ <<
-            " - Failed to set dynamic_reconfigure dc preset via system");
-      }
-    }
+    wrappedSystem(argv);
   }
 
   /*
@@ -234,95 +231,87 @@ namespace realsense_camera
    */
   std::string ZR300Nodelet::setDynamicReconfigDepthControlIndividuals()
   {
+    std::string current_param;
     std::string current_dc;
     std::string option_value;
 
     // There is not a C++ API for dynamic reconfig so we need to use a system call
     // Adding the sleep to ensure the current callback can end before we
     // attempt the next callback from the system call.
-    std::string system_cmd =
-      "(sleep 1 ; rosrun dynamic_reconfigure dynparam set ";
-    system_cmd += nodelet_name_ + " " +
-      "\"{" +
-      "'r200_dc_estimate_median_decrement':";
+    std::vector<std::string> argv;
+    argv.push_back("rosrun");
+    argv.push_back("dynamic_reconfigure");
+    argv.push_back("dynparam");
+    argv.push_back("set");
+    argv.push_back(nodelet_name_);
+
+    current_param = "{";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_ESTIMATE_MEDIAN_DECREMENT, 0)));
+    current_param += "'r200_dc_estimate_median_decrement':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_estimate_median_increment':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_ESTIMATE_MEDIAN_INCREMENT, 0)));
+    current_param += "'r200_dc_estimate_median_increment':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_median_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_MEDIAN_THRESHOLD, 0)));
+    current_param += "'r200_dc_median_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_score_minimum_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_SCORE_MINIMUM_THRESHOLD, 0)));
+    current_param += "'r200_dc_score_minimum_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_score_maximum_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_SCORE_MAXIMUM_THRESHOLD, 0)));
+    current_param += "'r200_dc_score_maximum_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_texture_count_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_TEXTURE_COUNT_THRESHOLD, 0)));
+    current_param += "'r200_dc_texture_count_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_texture_difference_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_TEXTURE_DIFFERENCE_THRESHOLD, 0)));
+    current_param += "'r200_dc_texture_difference_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_second_peak_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_SECOND_PEAK_THRESHOLD, 0)));
+    current_param += "'r200_dc_second_peak_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_neighbor_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_NEIGHBOR_THRESHOLD, 0)));
+    current_param += "'r200_dc_neighbor_threshold':" + option_value + ", ";
     current_dc += option_value + ":";
-    system_cmd += option_value +
-      ", 'r200_dc_lr_threshold':";
+
     option_value =
       std::to_string(static_cast<uint32_t>(rs_get_device_option(rs_device_,
               RS_OPTION_R200_DEPTH_CONTROL_LR_THRESHOLD, 0)));
+    current_param += "'r200_dc_lr_threshold':" + option_value + "}";
     current_dc += option_value;
-    system_cmd += option_value +
-      "}\")&";
 
-    ROS_DEBUG_STREAM(nodelet_name_ << " - Setting DC: " << system_cmd);
+    ROS_DEBUG_STREAM(nodelet_name_ << " - Setting DC: " << current_param);
 
-    int status = std::system(system_cmd.c_str());
-    if (status < 0)
-    {
-      ROS_WARN_STREAM(nodelet_name_ <<
-          " - Failed to set dynamic_reconfigure dc manual via system:"
-          << strerror(errno));
-    }
-    else
-    {
-      if (!WIFEXITED(status))
-      {
-        ROS_WARN_STREAM(nodelet_name_ <<
-            " - Failed to set dynamic_reconfigure dc manual via system");
-      }
-    }
+    argv.push_back(current_param);
+
+    wrappedSystem(argv);
 
     return current_dc;
   }
@@ -520,7 +509,7 @@ namespace realsense_camera
   {
     BaseNodelet::setStreams();
 
-    if (enable_[RS_STREAM_DEPTH] == true)
+    if (enable_[RS_STREAM_INFRARED2] == true)
     {
       enableStream(RS_STREAM_INFRARED2, width_[RS_STREAM_DEPTH], height_[RS_STREAM_DEPTH], format_[RS_STREAM_INFRARED2],
           fps_[RS_STREAM_DEPTH]);
@@ -534,7 +523,7 @@ namespace realsense_camera
       }
       ts_[RS_STREAM_INFRARED2] = -1;
     }
-    else if (enable_[RS_STREAM_DEPTH] == false)
+    else if (enable_[RS_STREAM_INFRARED2] == false)
     {
       disableStream(RS_STREAM_INFRARED2);
     }
@@ -699,6 +688,10 @@ namespace realsense_camera
 
     // Get offset between base frame and infrared2 frame
     rs_get_device_extrinsics(rs_device_, RS_STREAM_INFRARED2, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
     checkError();
 
     // Transform base frame to infrared2 frame
@@ -730,6 +723,10 @@ namespace realsense_camera
 
     // Get offset between base frame and fisheye frame
     rs_get_device_extrinsics(rs_device_, RS_STREAM_FISHEYE, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
     checkError();
 
     // Transform base frame to fisheye frame
@@ -761,14 +758,21 @@ namespace realsense_camera
 
 
     // Get offset between base frame and imu frame
-/*  Temporarily commenting out the code. Instead, hardcoding the values until fully supported by librealsense API.
 
     rs_get_motion_extrinsics_from(rs_device_, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
-    checkError();
-*/
-    z_extrinsic.translation[0] = -0.07;
-    z_extrinsic.translation[1] = 0.0;
-    z_extrinsic.translation[2] = 0.0;
+    if (rs_error_)
+    {
+/*  Temporarily hardcoding the values until fully supported by librealsense API.  */
+      // ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+      ROS_WARN_STREAM(nodelet_name_ << " - Using Hardcoded extrinsic for IMU.");
+      rs_free_error(rs_error_);
+      rs_error_ = NULL;
+
+      z_extrinsic.translation[0] = -0.07;
+      z_extrinsic.translation[1] = 0.0;
+      z_extrinsic.translation[2] = 0.0;
+    }
+    //checkError();
 
     // Transform base frame to imu frame
     b2imu_msg.header.stamp = static_transform_ts_;
