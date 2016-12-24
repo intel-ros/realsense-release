@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "-fPIE -fPIC -std=c++11 -O2 -D_FORTIFY_SOURCE=2 -fstack-prot
 # Flags executables
 set(CMAKE_EXE_LINKER_FLAGS "-pie -z noexecstack -z relro -z now")
 # Flags shared libraries
-set(CMAKE_SHARED_LINKER_FLAGS "-z noexecstack -z relro -z now")
+set(CMAKE_SHARED_LINKER_FLAGS "-z noexecstack -z relro -z now ${CMAKE_SHARED_LINKER_FLAGS}")
 
 find_package(catkin REQUIRED COMPONENTS
   librealsense
@@ -27,6 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   pcl_ros
+  roslint
 )
 
 add_message_files(
@@ -55,6 +56,10 @@ generate_dynamic_reconfigure_options(
   cfg/sr300_params.cfg
   cfg/zr300_params.cfg
 )
+
+# ROS Lint the code
+roslint_cpp()
+roslint_add_test()
 
 #################################
 # catkin specific configuration #
