@@ -28,9 +28,12 @@
  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
 
+#include <string>
+#include <vector>
+
 #include <realsense_camera/f200_nodelet.h>
 
-PLUGINLIB_EXPORT_CLASS (realsense_camera::F200Nodelet, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(realsense_camera::F200Nodelet, nodelet::Nodelet)
 
 namespace realsense_camera
 {
@@ -72,7 +75,7 @@ namespace realsense_camera
     std::vector<realsense_camera::f200_paramsConfig::AbstractParamDescriptionConstPtr> param_desc =
         params_config.__getParamDescriptions__();
     std::vector<std::string> dynamic_params;
-    for (realsense_camera::f200_paramsConfig::AbstractParamDescriptionConstPtr param_desc_ptr: param_desc)
+    for (realsense_camera::f200_paramsConfig::AbstractParamDescriptionConstPtr param_desc_ptr : param_desc)
     {
       dynamic_params.push_back((* param_desc_ptr).name);
     }
@@ -94,23 +97,9 @@ namespace realsense_camera
   void F200Nodelet::configCallback(realsense_camera::f200_paramsConfig &config, uint32_t level)
   {
     ROS_INFO_STREAM(nodelet_name_ << " - Setting dynamic camera options");
-    // Set flags
-    if (config.enable_depth == false)
-    {
-      if (enable_[RS_STREAM_COLOR] == false)
-      {
-        ROS_INFO_STREAM(nodelet_name_ << " - Color stream is also disabled. Cannot disable depth stream");
-        config.enable_depth = true;
-      }
-      else
-      {
-        enable_[RS_STREAM_DEPTH] = false;
-      }
-    }
-    else
-    {
-      enable_[RS_STREAM_DEPTH] = true;
-    }
+
+    // set the depth enable
+    BaseNodelet::setDepthEnable(config.enable_depth);
 
     // Set common options
     rs_set_device_option(rs_device_, RS_OPTION_COLOR_BACKLIGHT_COMPENSATION, config.color_backlight_compensation, 0);
@@ -135,5 +124,4 @@ namespace realsense_camera
     rs_set_device_option(rs_device_, RS_OPTION_F200_FILTER_OPTION, config.f200_filter_option, 0);
     rs_set_device_option(rs_device_, RS_OPTION_F200_CONFIDENCE_THRESHOLD, config.f200_confidence_threshold, 0);
   }
-}  // end namespace
-
+}  // namespace realsense_camera

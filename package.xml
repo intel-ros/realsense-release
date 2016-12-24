@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>realsense_camera</name>
-  <version>1.6.1</version>
+  <version>1.7.0</version>
   <description>RealSense Camera package allowing access to Intel 3D cameras and advanced modules</description>
 
   <maintainer email="rajvi.jingar@intel.com">Rajvi Jingar</maintainer>
@@ -33,12 +33,15 @@
   <depend>sensor_msgs</depend>
   <depend>pcl_ros</depend>
   <depend>dynamic_reconfigure</depend>
+  <depend>boost</depend>
 
   <exec_depend>rgbd_launch</exec_depend>
 
   <build_depend version_gte="1.11.0">librealsense</build_depend>
   <build_export_depend>librealsense</build_export_depend>
   <exec_depend>librealsense</exec_depend>
+
+  <build_depend>roslint</build_depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />
