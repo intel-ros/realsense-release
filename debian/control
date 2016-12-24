@@ -1,0 +1,12 @@
+Source: ros-kinetic-realsense-camera
+Section: misc
+Priority: extra
+Maintainer: Rajvi Jingar <rajvi.jingar@intel.com>
+Build-Depends: debhelper (>= 9.0.0), libboost-all-dev, ros-kinetic-camera-info-manager, ros-kinetic-catkin, ros-kinetic-cv-bridge, ros-kinetic-dynamic-reconfigure, ros-kinetic-image-transport, ros-kinetic-librealsense (>= 1.11.0), ros-kinetic-message-generation, ros-kinetic-nodelet, ros-kinetic-pcl-ros, ros-kinetic-roscpp, ros-kinetic-roslint, ros-kinetic-rostest, ros-kinetic-sensor-msgs, ros-kinetic-std-msgs, ros-kinetic-tf
+Homepage: http://www.ros.org/wiki/RealSense
+Standards-Version: 3.9.2
+
+Package: ros-kinetic-realsense-camera
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libboost-all-dev, ros-kinetic-camera-info-manager, ros-kinetic-cv-bridge, ros-kinetic-dynamic-reconfigure, ros-kinetic-image-transport, ros-kinetic-librealsense, ros-kinetic-message-generation, ros-kinetic-message-runtime, ros-kinetic-nodelet, ros-kinetic-pcl-ros, ros-kinetic-rgbd-launch, ros-kinetic-roscpp, ros-kinetic-rostest, ros-kinetic-sensor-msgs, ros-kinetic-std-msgs, ros-kinetic-tf
+Description: RealSense Camera package allowing access to Intel 3D cameras and advanced modules
