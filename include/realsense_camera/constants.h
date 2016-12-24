@@ -29,10 +29,11 @@
  *******************************************************************************/
 
 #include <iostream>
+#include <string>
 
 #pragma once
-#ifndef NODELET_CONSTANTS
-#define NODELET_CONSTANTS
+#ifndef REALSENSE_CAMERA_CONSTANTS_H
+#define REALSENSE_CAMERA_CONSTANTS_H
 
 namespace realsense_camera
 {
@@ -55,6 +56,7 @@ namespace realsense_camera
     const bool ENABLE_IMU = true;
     const bool ENABLE_PC = false;
     const bool ENABLE_TF = true;
+    const bool ENABLE_TF_DYNAMIC = false;
     const std::string DEFAULT_MODE = "preset";
     const std::string DEFAULT_BASE_FRAME_ID = "camera_link";
     const std::string DEFAULT_DEPTH_FRAME_ID = "camera_depth_frame";
@@ -95,11 +97,11 @@ namespace realsense_camera
 
     // SR300 Constants.
     // Indoor Range: 0.2m – 1.5m, Outdoor Range: n/a
-    const float SR300_MAX_Z = 1.5f; // in meters
+    const float SR300_MAX_Z = 1.5f;   // in meters
 
     // ZR300 Constants.
     // Indoor Range: 0.7m - 3.5m, Outdoor Range: 10m
-    const float ZR300_MAX_Z = 10.0f;   // in meters
+    const float ZR300_MAX_Z = 10.0f;  // in meters
     const std::string FISHEYE_NAMESPACE = "fisheye";
     const std::string FISHEYE_TOPIC = "image_raw";
     const std::string IMU_NAMESPACE = "imu";
@@ -112,5 +114,5 @@ namespace realsense_camera
     const std::string IMU_ACCEL = "IMU_ACCEL";
     const std::string IMU_GYRO = "IMU_GYRO";
     const double IMU_UNITS_TO_MSEC = 0.00003125;
-}
-#endif
+}  // namespace realsense_camera
+#endif  // REALSENSE_CAMERA_CONSTANTS_H
