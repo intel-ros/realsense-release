@@ -28,12 +28,29 @@
  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
 
+#include <string>
+#include <algorithm>
+#include <vector>
+
 #include <realsense_camera/zr300_nodelet.h>
 
-PLUGINLIB_EXPORT_CLASS (realsense_camera::ZR300Nodelet, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(realsense_camera::ZR300Nodelet, nodelet::Nodelet)
 
 namespace realsense_camera
 {
+  /*
+   * Nodelet Destructor.
+   */
+  ZR300Nodelet::~ZR300Nodelet()
+  {
+    if (enable_imu_ == true)
+    {
+      stopIMU();
+      // clean up imu thread
+      imu_thread_->join();
+    }
+  }
+
   /*
    * Initialize the nodelet.
    */
@@ -71,7 +88,7 @@ namespace realsense_camera
     if (enable_imu_ == true)
     {
       imu_thread_ =
-          boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&ZR300Nodelet::prepareIMU, this)));
+          boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&ZR300Nodelet::publishIMU, this)));
     }
   }
 
@@ -93,6 +110,11 @@ namespace realsense_camera
     pnh_.param("fisheye_optical_frame_id", optical_frame_id_[RS_STREAM_FISHEYE], DEFAULT_FISHEYE_OPTICAL_FRAME_ID);
     pnh_.param("imu_frame_id", imu_frame_id_, DEFAULT_IMU_FRAME_ID);
     pnh_.param("imu_optical_frame_id", imu_optical_frame_id_, DEFAULT_IMU_OPTICAL_FRAME_ID);
+
+    // set IR2 stream to match depth
+    width_[RS_STREAM_INFRARED2] = width_[RS_STREAM_DEPTH];
+    height_[RS_STREAM_INFRARED2] = height_[RS_STREAM_DEPTH];
+    fps_[RS_STREAM_INFRARED2] = fps_[RS_STREAM_DEPTH];
   }
 
   /*
@@ -186,9 +208,10 @@ namespace realsense_camera
     // Get dynamic options from the dynamic reconfigure server.
     realsense_camera::zr300_paramsConfig params_config;
     dynamic_reconf_server_->getConfigDefault(params_config);
-    std::vector<realsense_camera::zr300_paramsConfig::AbstractParamDescriptionConstPtr> param_desc = params_config.__getParamDescriptions__();
+    std::vector<realsense_camera::zr300_paramsConfig::AbstractParamDescriptionConstPtr> param_desc =
+      params_config.__getParamDescriptions__();
     std::vector<std::string> dynamic_params;
-    for (realsense_camera::zr300_paramsConfig::AbstractParamDescriptionConstPtr param_desc_ptr: param_desc)
+    for (realsense_camera::zr300_paramsConfig::AbstractParamDescriptionConstPtr param_desc_ptr : param_desc)
     {
       dynamic_params.push_back((* param_desc_ptr).name);
     }
@@ -330,7 +353,7 @@ namespace realsense_camera
     // level is the ORing of all levels which have a changed value
     std::bitset<32> bit_level{level};
 
-    if (bit_level.test(6)) // 2^6 = 64 : Depth Control Preset
+    if (bit_level.test(6))  // 2^6 = 64 : Depth Control Preset
     {
       ROS_INFO_STREAM(nodelet_name_ << " - Setting dynamic camera options" <<
           " (r200_dc_preset=" << config.r200_dc_preset << ")");
@@ -340,23 +363,8 @@ namespace realsense_camera
       ROS_INFO_STREAM(nodelet_name_ << " - Setting dynamic camera options");
     }
 
-    // Set flags
-    if (config.enable_depth == false)
-    {
-      if (enable_[RS_STREAM_COLOR] == false)
-      {
-        ROS_INFO_STREAM(nodelet_name_ << " - Color stream is also disabled. Cannot disable depth stream");
-        config.enable_depth = true;
-      }
-      else
-      {
-        enable_[RS_STREAM_DEPTH] = false;
-      }
-    }
-    else
-    {
-      enable_[RS_STREAM_DEPTH] = true;
-    }
+    // set the depth enable
+    BaseNodelet::setDepthEnable(config.enable_depth);
 
     // Set common options
     rs_set_device_option(rs_device_, RS_OPTION_COLOR_BACKLIGHT_COMPENSATION, config.color_backlight_compensation, 0);
@@ -368,7 +376,8 @@ namespace realsense_camera
     rs_set_device_option(rs_device_, RS_OPTION_COLOR_HUE, config.color_hue, 0);
     rs_set_device_option(rs_device_, RS_OPTION_COLOR_SATURATION, config.color_saturation, 0);
     rs_set_device_option(rs_device_, RS_OPTION_COLOR_SHARPNESS, config.color_sharpness, 0);
-    rs_set_device_option(rs_device_, RS_OPTION_COLOR_ENABLE_AUTO_WHITE_BALANCE, config.color_enable_auto_white_balance, 0);
+    rs_set_device_option(rs_device_, RS_OPTION_COLOR_ENABLE_AUTO_WHITE_BALANCE,
+        config.color_enable_auto_white_balance, 0);
     if (config.color_enable_auto_white_balance == 0)
     {
       rs_set_device_option(rs_device_, RS_OPTION_COLOR_WHITE_BALANCE, config.color_white_balance, 0);
@@ -386,7 +395,7 @@ namespace realsense_camera
 
     // Depth Control Group Settings
     // NOTE: do NOT use the config.groups values as they are zero the first time called
-    if (bit_level.test(5)) // 2^5 = 32 : Individual Depth Control settings
+    if (bit_level.test(5))  // 2^5 = 32 : Individual Depth Control settings
     {
       std::string current_dc;
 
@@ -426,11 +435,11 @@ namespace realsense_camera
       // Preset also changed in the same update callback
       // This is either First callback special case, or both set via
       // dynamic configure command line.
-      if (bit_level.test(6)) // 2^6 = 64 : Depth Control Preset
+      if (bit_level.test(6))  // 2^6 = 64 : Depth Control Preset
       {
         dc_preset = config.r200_dc_preset;
 
-        if (previous_dc_preset != -2) // not the first pass special case (-2)
+        if (previous_dc_preset != -2)  // not the first pass special case (-2)
         {
           // Changing individual Depth Control params means preset is Unused/Invalid
           // if the individual values are not the same as the preset values
@@ -449,7 +458,8 @@ namespace realsense_camera
           if (dc_preset != -1)
           {
             ROS_INFO_STREAM(nodelet_name_ << " - Initializing Depth Control Preset to " << dc_preset);
-            ROS_INFO_STREAM(nodelet_name_ << " - NOTICE: Individual Depth Control values set by params will be ignored; set r200_dc_preset=-1 to override.");
+            ROS_DEBUG_STREAM(nodelet_name_ << " - NOTICE: Individual Depth Control values " <<
+                "set by params will be ignored; set r200_dc_preset=-1 to override.");
             rs_apply_depth_control_preset(rs_device_, dc_preset);
 
             // Save the preset value string
@@ -470,7 +480,7 @@ namespace realsense_camera
     }
     else
     { // Individual Depth Control not set
-      if (bit_level.test(6)) // 2^6 = 64 : Depth Control Preset
+      if (bit_level.test(6))  // 2^6 = 64 : Depth Control Preset
       {
         dc_preset = config.r200_dc_preset;
 
@@ -503,84 +513,21 @@ namespace realsense_camera
   }
 
   /*
-   * Set the streams according to their corresponding flag values.
+   * Publish IMU.
    */
-  void ZR300Nodelet::setStreams()
+  void ZR300Nodelet::publishIMU()
   {
-    BaseNodelet::setStreams();
-
-    if (enable_[RS_STREAM_INFRARED2] == true)
-    {
-      enableStream(RS_STREAM_INFRARED2, width_[RS_STREAM_DEPTH], height_[RS_STREAM_DEPTH], format_[RS_STREAM_INFRARED2],
-          fps_[RS_STREAM_DEPTH]);
-      if (camera_info_ptr_[RS_STREAM_INFRARED2] == NULL)
-      {
-        ROS_DEBUG_STREAM(nodelet_name_ << " - Allocating resources for " << STREAM_DESC[RS_STREAM_INFRARED2]);
-        getStreamCalibData(RS_STREAM_INFRARED2);
-        step_[RS_STREAM_INFRARED2] = camera_info_ptr_[RS_STREAM_INFRARED2]->width * unit_step_size_[RS_STREAM_INFRARED2];
-        image_[RS_STREAM_INFRARED2] = cv::Mat(camera_info_ptr_[RS_STREAM_INFRARED2]->height,
-            camera_info_ptr_[RS_STREAM_INFRARED2]->width, cv_type_[RS_STREAM_INFRARED2], cv::Scalar(0, 0, 0));
-      }
-      ts_[RS_STREAM_INFRARED2] = -1;
-    }
-    else if (enable_[RS_STREAM_INFRARED2] == false)
-    {
-      disableStream(RS_STREAM_INFRARED2);
-    }
-
-    if (enable_[RS_STREAM_FISHEYE] == true)
-    {
-      enableStream(RS_STREAM_FISHEYE, width_[RS_STREAM_FISHEYE], height_[RS_STREAM_FISHEYE], format_[RS_STREAM_FISHEYE],
-              fps_[RS_STREAM_FISHEYE]);
-      if (camera_info_ptr_[RS_STREAM_FISHEYE] == NULL)
-      {
-        ROS_DEBUG_STREAM(nodelet_name_ << " - Allocating resources for " << STREAM_DESC[RS_STREAM_FISHEYE]);
-        getStreamCalibData(RS_STREAM_FISHEYE);
-        step_[RS_STREAM_FISHEYE] = camera_info_ptr_[RS_STREAM_FISHEYE]->width * unit_step_size_[RS_STREAM_FISHEYE];
-        image_[RS_STREAM_FISHEYE] = cv::Mat(camera_info_ptr_[RS_STREAM_FISHEYE]->height,
-            camera_info_ptr_[RS_STREAM_FISHEYE]->width, cv_type_[RS_STREAM_FISHEYE], cv::Scalar(0, 0, 0));
-      }
-      ts_[RS_STREAM_FISHEYE] = -1;
-    }
-    else if (enable_[RS_STREAM_FISHEYE] == false)
-    {
-      disableStream(RS_STREAM_FISHEYE);
-    }
-  }
-
-  /*
-   * Publish topics for native streams.
-   */
-  void ZR300Nodelet::publishTopics()
-  {
-    BaseNodelet::publishTopics();
-
-    publishTopic(RS_STREAM_INFRARED2);
-    publishTopic(RS_STREAM_FISHEYE);
-  }
-
-  /*
-   * Prepare IMU.
-   */
-  void ZR300Nodelet::prepareIMU()
-  {
-    setIMUCallbacks();
-
-    ROS_INFO_STREAM(nodelet_name_ << " - Enabling IMU");
-    rs_enable_motion_tracking_cpp(rs_device_, new rs::motion_callback(motion_handler_),
-        new rs::timestamp_callback(timestamp_handler_), &rs_error_);
-    checkError();
-    rs_start_source(rs_device_, (rs_source)rs::source::motion_data, &rs_error_);
-    checkError();
     prev_imu_ts_ = -1;
     while (ros::ok())
     {
       if (imu_publisher_.getNumSubscribers() > 0)
       {
+        std::unique_lock<std::mutex> lock(imu_mutex_);
+
         if (prev_imu_ts_ != imu_ts_)
         {
           sensor_msgs::Imu imu_msg = sensor_msgs::Imu();
-          imu_msg.header.stamp = ros::Time::now();
+          imu_msg.header.stamp = ros::Time(camera_start_ts_) + ros::Duration(imu_ts_ * 0.001);
           imu_msg.header.frame_id = imu_optical_frame_id_;
 
           imu_msg.orientation.x = 0.0;
@@ -608,11 +555,27 @@ namespace realsense_camera
         }
       }
     }
+    stopIMU();
+  }
 
-    rs_stop_source(rs_device_, (rs_source)rs::source::motion_data, &rs_error_);
-    checkError();
-    rs_disable_motion_tracking(rs_device_, &rs_error_);
-    checkError();
+  /*
+   * Set up IMU -- overrides base class
+   */
+  void ZR300Nodelet::setStreams()
+  {
+    // enable camera streams
+    BaseNodelet::setStreams();
+
+    if (enable_imu_ == true)
+    {
+      // enable IMU
+      ROS_INFO_STREAM(nodelet_name_ << " - Enabling IMU");
+      setIMUCallbacks();
+      rs_enable_motion_tracking_cpp(rs_device_, new rs::motion_callback(motion_handler_),
+          new rs::timestamp_callback(timestamp_handler_), &rs_error_);
+      checkError();
+      rs_source_ = RS_SOURCE_ALL;  // overrides default to enable motion tracking
+    }
   }
 
   /*
@@ -620,39 +583,39 @@ namespace realsense_camera
    */
   void ZR300Nodelet::setIMUCallbacks()
   {
-    motion_handler_ = [&](rs::motion_data entry)
+    motion_handler_ = [&](rs::motion_data entry)  // NOLINT(build/c++11)
     {
-        auto now = std::chrono::system_clock::now().time_since_epoch();
-        auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-        imu_ts_ = sys_time;
-        if (entry.timestamp_data.source_id == RS_EVENT_IMU_GYRO)
-        {
-          for (int i = 0; i < 3; ++i)
-          {
-            imu_angular_vel_[i] = entry.axes[i];
-            imu_linear_accel_[i] = 0.0;
-          }
-          imu_angular_vel_cov_[0] = 0.0;
-          imu_linear_accel_cov_[0] = -1.0;
-        }
-        else if (entry.timestamp_data.source_id == RS_EVENT_IMU_ACCEL)
-        {
-          for (int i = 0; i < 3; ++i)
-          {
-            imu_angular_vel_[i] = 0.0;
-            imu_linear_accel_[i] = entry.axes[i];
-          }
-          imu_angular_vel_cov_[0] = -1.0;
-          imu_linear_accel_cov_[0] = 0.0;
-        }
+      std::unique_lock<std::mutex> lock(imu_mutex_);
 
-        ROS_DEBUG_STREAM(" - Motion,\t host time " << sys_time
-            << "\ttimestamp: " << std::setprecision(8) << (double)entry.timestamp_data.timestamp*IMU_UNITS_TO_MSEC
-            << "\tsource: " << (rs::event)entry.timestamp_data.source_id
-            << "\tframe_num: " << entry.timestamp_data.frame_number
-            << "\tx: " << std::setprecision(5) <<  entry.axes[0]
-            << "\ty: " << entry.axes[1]
-            << "\tz: " << entry.axes[2]);
+      if (entry.timestamp_data.source_id == RS_EVENT_IMU_GYRO)
+      {
+        for (int i = 0; i < 3; ++i)
+        {
+          imu_angular_vel_[i] = entry.axes[i];
+          imu_linear_accel_[i] = 0.0;
+        }
+        imu_angular_vel_cov_[0] = 0.0;
+        imu_linear_accel_cov_[0] = -1.0;
+      }
+      else if (entry.timestamp_data.source_id == RS_EVENT_IMU_ACCEL)
+      {
+        for (int i = 0; i < 3; ++i)
+        {
+          imu_angular_vel_[i] = 0.0;
+          imu_linear_accel_[i] = entry.axes[i];
+        }
+        imu_angular_vel_cov_[0] = -1.0;
+        imu_linear_accel_cov_[0] = 0.0;
+      }
+      imu_ts_ = static_cast<double>(entry.timestamp_data.timestamp);
+
+      ROS_DEBUG_STREAM(" - Motion,\t host time " << imu_ts_
+          << "\ttimestamp: " << std::setprecision(8) << (double)entry.timestamp_data.timestamp*IMU_UNITS_TO_MSEC
+          << "\tsource: " << (rs::event)entry.timestamp_data.source_id
+          << "\tframe_num: " << entry.timestamp_data.frame_number
+          << "\tx: " << std::setprecision(5) <<  entry.axes[0]
+          << "\ty: " << entry.axes[1]
+          << "\tz: " << entry.axes[2]);
     };
 
     // Get timestamp that syncs all sensors.
@@ -669,7 +632,73 @@ namespace realsense_camera
   }
 
   /*
-   * Prepare and publish transforms.
+  * Set up the callbacks for the camera streams
+  */
+  void ZR300Nodelet::setFrameCallbacks()
+  {
+    // call base nodelet method
+    BaseNodelet::setFrameCallbacks();
+
+    fisheye_frame_handler_ = [&](rs::frame frame)  // NOLINT(build/c++11)
+    {
+      publishTopic(RS_STREAM_FISHEYE, frame);
+    };
+
+    ir2_frame_handler_ = [&](rs::frame frame)  // NOLINT(build/c++11)
+    {
+      publishTopic(RS_STREAM_INFRARED2, frame);
+    };
+
+    rs_set_frame_callback_cpp(rs_device_, RS_STREAM_FISHEYE,
+        new rs::frame_callback(fisheye_frame_handler_), &rs_error_);
+    checkError();
+
+    rs_set_frame_callback_cpp(rs_device_, RS_STREAM_INFRARED2, new rs::frame_callback(ir2_frame_handler_), &rs_error_);
+    checkError();
+  }
+
+  /*
+   * Get the camera extrinsics
+   */
+  void ZR300Nodelet::getCameraExtrinsics()
+  {
+    BaseNodelet::getCameraExtrinsics();
+
+    // Get offset between base frame and infrared2 frame
+    rs_get_device_extrinsics(rs_device_, RS_STREAM_INFRARED2, RS_STREAM_COLOR, &color2ir2_extrinsic_, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
+    checkError();
+
+    // Get offset between base frame and fisheye frame
+    rs_get_device_extrinsics(rs_device_, RS_STREAM_FISHEYE, RS_STREAM_COLOR, &color2fisheye_extrinsic_, &rs_error_);
+    if (rs_error_)
+    {
+      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+    }
+    checkError();
+
+    // Get offset between base frame and imu frame
+    rs_get_motion_extrinsics_from(rs_device_, RS_STREAM_COLOR, &color2imu_extrinsic_, &rs_error_);
+    if (rs_error_)
+    {
+/*  Temporarily hardcoding the values until fully supported by librealsense API.  */
+      // ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
+      ROS_WARN_STREAM(nodelet_name_ << " - Using Hardcoded extrinsic for IMU.");
+      rs_free_error(rs_error_);
+      rs_error_ = NULL;
+
+      color2imu_extrinsic_.translation[0] = -0.07;
+      color2imu_extrinsic_.translation[1] = 0.0;
+      color2imu_extrinsic_.translation[2] = 0.0;
+    }
+    // checkError();
+  }
+
+  /*
+   * Publish Static transforms.
    */
   void ZR300Nodelet::publishStaticTransforms()
   {
@@ -678,7 +707,6 @@ namespace realsense_camera
     tf::Quaternion q_i2io;
     tf::Quaternion q_f2fo;
     tf::Quaternion q_imu2imuo;
-    rs_extrinsics z_extrinsic;
     geometry_msgs::TransformStamped b2i_msg;
     geometry_msgs::TransformStamped i2io_msg;
     geometry_msgs::TransformStamped b2f_msg;
@@ -686,21 +714,13 @@ namespace realsense_camera
     geometry_msgs::TransformStamped b2imu_msg;
     geometry_msgs::TransformStamped imu2imuo_msg;
 
-    // Get offset between base frame and infrared2 frame
-    rs_get_device_extrinsics(rs_device_, RS_STREAM_INFRARED2, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
-    if (rs_error_)
-    {
-      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
-    }
-    checkError();
-
     // Transform base frame to infrared2 frame
-    b2i_msg.header.stamp = static_transform_ts_;
+    b2i_msg.header.stamp = transform_ts_;
     b2i_msg.header.frame_id = base_frame_id_;
     b2i_msg.child_frame_id = frame_id_[RS_STREAM_INFRARED2];
-    b2i_msg.transform.translation.x =  z_extrinsic.translation[2];
-    b2i_msg.transform.translation.y = -z_extrinsic.translation[0];
-    b2i_msg.transform.translation.z = -z_extrinsic.translation[1];
+    b2i_msg.transform.translation.x =  color2ir2_extrinsic_.translation[2];
+    b2i_msg.transform.translation.y = -color2ir2_extrinsic_.translation[0];
+    b2i_msg.transform.translation.z = -color2ir2_extrinsic_.translation[1];
     b2i_msg.transform.rotation.x = 0;
     b2i_msg.transform.rotation.y = 0;
     b2i_msg.transform.rotation.z = 0;
@@ -709,7 +729,7 @@ namespace realsense_camera
 
     // Transform infrared2 frame to infrared2 optical frame
     q_i2io.setEuler(M_PI/2, 0.0, -M_PI/2);
-    i2io_msg.header.stamp = static_transform_ts_;
+    i2io_msg.header.stamp = transform_ts_;
     i2io_msg.header.frame_id = frame_id_[RS_STREAM_INFRARED2];
     i2io_msg.child_frame_id = optical_frame_id_[RS_STREAM_INFRARED2];
     i2io_msg.transform.translation.x = 0;
@@ -721,21 +741,13 @@ namespace realsense_camera
     i2io_msg.transform.rotation.w = q_i2io.getW();
     static_tf_broadcaster_.sendTransform(i2io_msg);
 
-    // Get offset between base frame and fisheye frame
-    rs_get_device_extrinsics(rs_device_, RS_STREAM_FISHEYE, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
-    if (rs_error_)
-    {
-      ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
-    }
-    checkError();
-
     // Transform base frame to fisheye frame
-    b2f_msg.header.stamp = static_transform_ts_;
+    b2f_msg.header.stamp = transform_ts_;
     b2f_msg.header.frame_id = base_frame_id_;
     b2f_msg.child_frame_id = frame_id_[RS_STREAM_FISHEYE];
-    b2f_msg.transform.translation.x =  z_extrinsic.translation[2];
-    b2f_msg.transform.translation.y = -z_extrinsic.translation[0];
-    b2f_msg.transform.translation.z = -z_extrinsic.translation[1];
+    b2f_msg.transform.translation.x =  color2fisheye_extrinsic_.translation[2];
+    b2f_msg.transform.translation.y = -color2fisheye_extrinsic_.translation[0];
+    b2f_msg.transform.translation.z = -color2fisheye_extrinsic_.translation[1];
     b2f_msg.transform.rotation.x = 0;
     b2f_msg.transform.rotation.y = 0;
     b2f_msg.transform.rotation.z = 0;
@@ -744,7 +756,7 @@ namespace realsense_camera
 
     // Transform fisheye frame to fisheye optical frame
     q_f2fo.setEuler(M_PI/2, 0.0, -M_PI/2);
-    f2fo_msg.header.stamp = static_transform_ts_;
+    f2fo_msg.header.stamp = transform_ts_;
     f2fo_msg.header.frame_id = frame_id_[RS_STREAM_FISHEYE];
     f2fo_msg.child_frame_id = optical_frame_id_[RS_STREAM_FISHEYE];
     f2fo_msg.transform.translation.x = 0;
@@ -756,31 +768,13 @@ namespace realsense_camera
     f2fo_msg.transform.rotation.w = q_f2fo.getW();
     static_tf_broadcaster_.sendTransform(f2fo_msg);
 
-
-    // Get offset between base frame and imu frame
-
-    rs_get_motion_extrinsics_from(rs_device_, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
-    if (rs_error_)
-    {
-/*  Temporarily hardcoding the values until fully supported by librealsense API.  */
-      // ROS_ERROR_STREAM(nodelet_name_ << " - Verify camera is calibrated!");
-      ROS_WARN_STREAM(nodelet_name_ << " - Using Hardcoded extrinsic for IMU.");
-      rs_free_error(rs_error_);
-      rs_error_ = NULL;
-
-      z_extrinsic.translation[0] = -0.07;
-      z_extrinsic.translation[1] = 0.0;
-      z_extrinsic.translation[2] = 0.0;
-    }
-    //checkError();
-
     // Transform base frame to imu frame
-    b2imu_msg.header.stamp = static_transform_ts_;
+    b2imu_msg.header.stamp = transform_ts_;
     b2imu_msg.header.frame_id = base_frame_id_;
     b2imu_msg.child_frame_id = imu_frame_id_;
-    b2imu_msg.transform.translation.x =  z_extrinsic.translation[2];
-    b2imu_msg.transform.translation.y = -z_extrinsic.translation[0];
-    b2imu_msg.transform.translation.z = -z_extrinsic.translation[1];
+    b2imu_msg.transform.translation.x =  color2imu_extrinsic_.translation[2];
+    b2imu_msg.transform.translation.y = -color2imu_extrinsic_.translation[0];
+    b2imu_msg.transform.translation.z = -color2imu_extrinsic_.translation[1];
     b2imu_msg.transform.rotation.x = 0;
     b2imu_msg.transform.rotation.y = 0;
     b2imu_msg.transform.rotation.z = 0;
@@ -789,7 +783,7 @@ namespace realsense_camera
 
     // Transform imu frame to imu optical frame
     q_imu2imuo.setEuler(M_PI/2, 0.0, -M_PI/2);
-    imu2imuo_msg.header.stamp = static_transform_ts_;
+    imu2imuo_msg.header.stamp = transform_ts_;
     imu2imuo_msg.header.frame_id = imu_frame_id_;
     imu2imuo_msg.child_frame_id = imu_optical_frame_id_;
     imu2imuo_msg.transform.translation.x = 0;
@@ -800,7 +794,75 @@ namespace realsense_camera
     imu2imuo_msg.transform.rotation.z = q_imu2imuo.getZ();
     imu2imuo_msg.transform.rotation.w = q_imu2imuo.getW();
     static_tf_broadcaster_.sendTransform(imu2imuo_msg);
-
   }
-}  // end namespace
 
+  /*
+   * Publish Dynamic transforms.
+   */
+  void ZR300Nodelet::publishDynamicTransforms()
+  {
+    tf::Transform tr;
+    tf::Quaternion q;
+
+    BaseNodelet::publishDynamicTransforms();
+
+    // Transform base frame to infrared2 frame
+    tr.setOrigin(tf::Vector3(
+           color2ir2_extrinsic_.translation[2],
+          -color2ir2_extrinsic_.translation[0],
+          -color2ir2_extrinsic_.translation[1]));
+    tr.setRotation(tf::Quaternion(0, 0, 0, 1));
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          base_frame_id_, frame_id_[RS_STREAM_INFRARED2]));
+
+    // Transform infrared2 frame to infrared2 optical frame
+    tr.setOrigin(tf::Vector3(0, 0, 0));
+    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    tr.setRotation(q);
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          frame_id_[RS_STREAM_INFRARED2], optical_frame_id_[RS_STREAM_INFRARED2]));
+
+    // Transform base frame to fisheye frame
+    tr.setOrigin(tf::Vector3(
+           color2fisheye_extrinsic_.translation[2],
+          -color2fisheye_extrinsic_.translation[0],
+          -color2fisheye_extrinsic_.translation[1]));
+    tr.setRotation(tf::Quaternion(0, 0, 0, 1));
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          base_frame_id_, frame_id_[RS_STREAM_FISHEYE]));
+
+    // Transform fisheye frame to fisheye optical frame
+    tr.setOrigin(tf::Vector3(0, 0, 0));
+    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    tr.setRotation(q);
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          frame_id_[RS_STREAM_FISHEYE], optical_frame_id_[RS_STREAM_FISHEYE]));
+
+    // Transform base frame to imu frame
+    tr.setOrigin(tf::Vector3(
+           color2imu_extrinsic_.translation[2],
+          -color2imu_extrinsic_.translation[0],
+          -color2imu_extrinsic_.translation[1]));
+    tr.setRotation(tf::Quaternion(0, 0, 0, 1));
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          base_frame_id_, imu_frame_id_));
+
+    // Transform imu frame to imu optical frame
+    tr.setOrigin(tf::Vector3(0, 0, 0));
+    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    tr.setRotation(q);
+    dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
+          imu_frame_id_, imu_optical_frame_id_));
+  }
+
+  /*
+   * Stop the IMU and motion tracking
+   */
+  void ZR300Nodelet::stopIMU()
+  {
+    rs_stop_source(rs_device_, (rs_source)rs::source::motion_data, &rs_error_);
+    checkError();
+    rs_disable_motion_tracking(rs_device_, &rs_error_);
+    checkError();
+  }
+}  // namespace realsense_camera
