@@ -498,8 +498,6 @@ namespace realsense_camera
     rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_EXPOSURE,
         config.fisheye_exposure, 0);
     rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_GAIN, config.fisheye_gain, 0);
-    rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_STROBE, config.fisheye_strobe, 0);
-    rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_EXTERNAL_TRIGGER, config.fisheye_external_trigger, 0);
     rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_ENABLE_AUTO_EXPOSURE, config.fisheye_enable_auto_exposure, 0);
     rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_AUTO_EXPOSURE_MODE, config.fisheye_auto_exposure_mode, 0);
     rs_set_device_option(rs_device_, RS_OPTION_FISHEYE_AUTO_EXPOSURE_ANTIFLICKER_RATE,
@@ -728,7 +726,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2i_msg);
 
     // Transform infrared2 frame to infrared2 optical frame
-    q_i2io.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_i2io.setRPY(-M_PI/2, 0.0, -M_PI/2);
     i2io_msg.header.stamp = transform_ts_;
     i2io_msg.header.frame_id = frame_id_[RS_STREAM_INFRARED2];
     i2io_msg.child_frame_id = optical_frame_id_[RS_STREAM_INFRARED2];
@@ -755,7 +753,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2f_msg);
 
     // Transform fisheye frame to fisheye optical frame
-    q_f2fo.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_f2fo.setRPY(-M_PI/2, 0.0, -M_PI/2);
     f2fo_msg.header.stamp = transform_ts_;
     f2fo_msg.header.frame_id = frame_id_[RS_STREAM_FISHEYE];
     f2fo_msg.child_frame_id = optical_frame_id_[RS_STREAM_FISHEYE];
@@ -782,7 +780,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2imu_msg);
 
     // Transform imu frame to imu optical frame
-    q_imu2imuo.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_imu2imuo.setRPY(-M_PI/2, 0.0, -M_PI/2);
     imu2imuo_msg.header.stamp = transform_ts_;
     imu2imuo_msg.header.frame_id = imu_frame_id_;
     imu2imuo_msg.child_frame_id = imu_optical_frame_id_;
@@ -817,7 +815,7 @@ namespace realsense_camera
 
     // Transform infrared2 frame to infrared2 optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           frame_id_[RS_STREAM_INFRARED2], optical_frame_id_[RS_STREAM_INFRARED2]));
@@ -833,7 +831,7 @@ namespace realsense_camera
 
     // Transform fisheye frame to fisheye optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           frame_id_[RS_STREAM_FISHEYE], optical_frame_id_[RS_STREAM_FISHEYE]));
@@ -849,7 +847,7 @@ namespace realsense_camera
 
     // Transform imu frame to imu optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           imu_frame_id_, imu_optical_frame_id_));
