@@ -137,7 +137,7 @@ namespace realsense_camera
   }
   catch(...)
   {
-    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown expection...shutting down!");
+    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown exception...shutting down!");
     ros::shutdown();
   }
 
@@ -568,7 +568,7 @@ namespace realsense_camera
           {
             opt_val = val;
           }
-          ROS_DEBUG_STREAM(nodelet_name_ << " - " << opt_name << " = " << opt_val);
+          ROS_INFO_STREAM(nodelet_name_ << " - Setting camera option " << opt_name << " = " << opt_val);
           rs_set_device_option(rs_device_, o.opt, opt_val, &rs_error_);
           checkError();
         }
@@ -863,7 +863,7 @@ namespace realsense_camera
   }
 
   /*
-   * Determine the timetamp for the publish topic.
+   * Determine the timestamp for the publish topic.
    */
   ros::Time BaseNodelet::getTimestamp(rs_stream stream_index, double frame_ts)
   {
@@ -915,7 +915,7 @@ namespace realsense_camera
   }
   catch(...)
   {
-    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown expection...shutting down!");
+    ROS_ERROR_STREAM(nodelet_name_ << " - Caught unknown exception...shutting down!");
     ros::shutdown();
   }
 
@@ -1091,7 +1091,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2c_msg);
 
     // Transform color frame to color optical frame
-    q_c2co.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_c2co.setRPY(-M_PI/2, 0.0, -M_PI/2);
     c2co_msg.header.stamp = transform_ts_;
     c2co_msg.header.frame_id = frame_id_[RS_STREAM_COLOR];
     c2co_msg.child_frame_id = optical_frame_id_[RS_STREAM_COLOR];
@@ -1118,7 +1118,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2d_msg);
 
     // Transform depth frame to depth optical frame
-    q_d2do.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_d2do.setRPY(-M_PI/2, 0.0, -M_PI/2);
     d2do_msg.header.stamp = transform_ts_;
     d2do_msg.header.frame_id = frame_id_[RS_STREAM_DEPTH];
     d2do_msg.child_frame_id = optical_frame_id_[RS_STREAM_DEPTH];
@@ -1145,7 +1145,7 @@ namespace realsense_camera
     static_tf_broadcaster_.sendTransform(b2i_msg);
 
     // Transform infrared frame to infrared optical frame
-    q_i2io.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q_i2io.setRPY(-M_PI/2, 0.0, -M_PI/2);
     i2io_msg.header.stamp = transform_ts_;
     i2io_msg.header.frame_id = frame_id_[RS_STREAM_INFRARED];
     i2io_msg.child_frame_id = optical_frame_id_[RS_STREAM_INFRARED];
@@ -1176,7 +1176,7 @@ namespace realsense_camera
 
     // Transform color frame to color optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           frame_id_[RS_STREAM_COLOR], optical_frame_id_[RS_STREAM_COLOR]));
@@ -1192,7 +1192,7 @@ namespace realsense_camera
 
     // Transform depth frame to depth optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           frame_id_[RS_STREAM_DEPTH], optical_frame_id_[RS_STREAM_DEPTH]));
@@ -1208,7 +1208,7 @@ namespace realsense_camera
 
     // Transform infrared frame to infrared optical frame
     tr.setOrigin(tf::Vector3(0, 0, 0));
-    q.setEuler(M_PI/2, 0.0, -M_PI/2);
+    q.setRPY(-M_PI/2, 0.0, -M_PI/2);
     tr.setRotation(q);
     dynamic_tf_broadcaster_.sendTransform(tf::StampedTransform(tr, transform_ts_,
           frame_id_[RS_STREAM_INFRARED], optical_frame_id_[RS_STREAM_INFRARED]));
