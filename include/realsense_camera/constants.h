@@ -1,5 +1,5 @@
 /******************************************************************************
- Copyright (c) 2016, Intel Corporation
+ Copyright (c) 2017, Intel Corporation
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -59,6 +59,7 @@ namespace realsense_camera
     const bool ENABLE_PC = false;
     const bool ENABLE_TF = true;
     const bool ENABLE_TF_DYNAMIC = false;
+    const double TF_PUBLICATION_RATE = 1.0;
     const std::string DEFAULT_MODE = "preset";
     const std::string DEFAULT_BASE_FRAME_ID = "camera_link";
     const std::string DEFAULT_DEPTH_FRAME_ID = "camera_depth_frame";
@@ -118,8 +119,8 @@ namespace realsense_camera
     const std::string IMU_ACCEL = "IMU_ACCEL";
     const std::string IMU_GYRO = "IMU_GYRO";
     const double IMU_UNITS_TO_MSEC = 0.00003125;
-    const std::string ZR300_CAMERA_FW_VERSION = "2.0.71.26";
-    const std::string ZR300_ADAPTER_FW_VERSION = "1.28.0.0";
+    const std::string ZR300_CAMERA_FW_VERSION = "2.0.71.28";
+    const std::string ZR300_ADAPTER_FW_VERSION = "1.29.0.0";
     const std::string ZR300_MOTION_MODULE_FW_VERSION = "1.25.0.0";
 
     // map the camera name to its validated firmware
