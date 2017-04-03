@@ -1,5 +1,5 @@
 /******************************************************************************
- Copyright (c) 2016, Intel Corporation
+ Copyright (c) 2017, Intel Corporation
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -128,6 +128,7 @@ protected:
   bool enable_pointcloud_;
   bool enable_tf_;
   bool enable_tf_dynamic_;
+  double tf_publication_rate_;
   const uint16_t *image_depth16_;
   cv::Mat cvWrapper_;
   std::mutex frame_mutex_[STREAM_COUNT];
@@ -139,6 +140,8 @@ protected:
   rs_extrinsics color2depth_extrinsic_;  // color frame is base frame
   rs_extrinsics color2ir_extrinsic_;     // color frame is base frame
   rs_source rs_source_ = RS_SOURCE_VIDEO;
+  bool start_camera_ = true;
+  bool start_stop_srv_called_ = false;
 
   struct CameraOptions
   {
