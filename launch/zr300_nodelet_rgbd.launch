@@ -6,7 +6,11 @@
   <arg name="camera"          default="camera" />
 
   <!-- Type of RealSense camera -->
-  <arg name="camera_type"     default="R200" />
+  <arg name="camera_type"     default="ZR300" />
+
+  <!--  ZR300 specific features -->
+  <arg name="enable_fisheye"      default="true" />
+  <arg name="enable_imu"          default="true" />
 
   <!-- "serial_no" or "usb_port_id" should be a unique identifier to connect to a device -->
   <arg name="serial_no"     default="" />
@@ -41,7 +45,6 @@
 
   <!-- Processing Modules -->
   <arg name="rgb_processing"                  default="true"/>
-  <arg name="debayer_processing"              default="true" />
   <arg name="ir_processing"                   default="true"/>
   <arg name="depth_processing"                default="true"/>
   <arg name="depth_registered_processing"     default="true"/>
@@ -79,6 +82,8 @@
       <arg name="depth"                     value="$(arg depth)" />
       <arg name="rgb"                       value="$(arg rgb)" />
       <arg name="ir"                        value="$(arg ir)" />
+      <arg name="enable_fisheye"            value="$(arg enable_fisheye)" />
+      <arg name="enable_imu"                value="$(arg enable_imu)" />
       <arg name="publish_tf"                value="$(arg publish_tf)" />
       <arg name="mode"                      value="$(arg mode)" />
       <arg name="depth_width"               value="$(arg depth_width)" />
@@ -99,7 +104,6 @@
       <arg name="projector"                       value="$(arg projector)" />
       <arg name="respawn"                         value="$(arg respawn)" />
       <arg name="rgb_processing"                  value="$(arg rgb_processing)" />
-      <arg name="debayer_processing"              value="$(arg debayer_processing)" />
       <arg name="ir_processing"                   value="$(arg ir_processing)" />
       <arg name="depth_processing"                value="$(arg depth_processing)" />
       <arg name="depth_registered_processing"     value="$(arg depth_registered_processing)" />
