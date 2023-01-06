@@ -7,6 +7,15 @@ Intel has ceased development and contributions including, but not limited to, ma
 Intel no longer accepts patches to this project.
 
 If you have an ongoing need to use this project, are interested in independently developing it, or would like to maintain patches for the open source software community, please create your own fork of this project.  
+DISCONTINUATION OF PROJECT
+
+This project will no longer be maintained by Intel.
+
+Intel has ceased development and contributions including, but not limited to, maintenance, bug fixes, new releases, or updates, to this project.  
+
+Intel no longer accepts patches to this project.
+
+If you have an ongoing need to use this project, are interested in independently developing it, or would like to maintain patches for the open source software community, please create your own fork of this project.  
 ## realsense_camera (kinetic) - 1.8.1-1
 
 The packages in the `realsense_camera` repository were released into the `kinetic` distro by running `/usr/bin/bloom-release --track kinetic --rosdistro kinetic realsense_camera` on `Wed, 20 Dec 2017 15:24:56 -0000`
